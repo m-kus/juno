@@ -1052,3 +1052,10 @@ func TestSubscribeL1Head(t *testing.T) {
 	require.True(t, ok)
 	assert.Equal(t, l1Head, got)
 }
+
+func TestStateCommitmentEmptyChain(t *testing.T) {
+	chain := blockchain.New(memory.New(), &utils.Mainnet)
+	commitment, err := chain.StateCommitment()
+	require.NoError(t, err)
+	assert.Equal(t, felt.Felt{}, commitment)
+}

@@ -72,18 +72,18 @@ func (mr *MockStateMockRecorder) ClassTrie() *gomock.Call {
 }
 
 // Commitment mocks base method.
-func (m *MockState) Commitment() (felt.Felt, error) {
+func (m *MockState) Commitment(protocolVersion string) (felt.Felt, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "Commitment")
+	ret := m.ctrl.Call(m, "Commitment", protocolVersion)
 	ret0, _ := ret[0].(felt.Felt)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // Commitment indicates an expected call of Commitment.
-func (mr *MockStateMockRecorder) Commitment() *gomock.Call {
+func (mr *MockStateMockRecorder) Commitment(protocolVersion any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Commitment", reflect.TypeOf((*MockState)(nil).Commitment))
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Commitment", reflect.TypeOf((*MockState)(nil).Commitment), protocolVersion)
 }
 
 // CompiledClassHash mocks base method.
@@ -267,29 +267,29 @@ func (mr *MockStateMockRecorder) ContractTrie() *gomock.Call {
 }
 
 // Revert mocks base method.
-func (m *MockState) Revert(blockNum uint64, update *core.StateUpdate) error {
+func (m *MockState) Revert(blockNum uint64, update *core.StateUpdate, protocolVersion string) error {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "Revert", blockNum, update)
+	ret := m.ctrl.Call(m, "Revert", blockNum, update, protocolVersion)
 	ret0, _ := ret[0].(error)
 	return ret0
 }
 
 // Revert indicates an expected call of Revert.
-func (mr *MockStateMockRecorder) Revert(blockNum, update any) *gomock.Call {
+func (mr *MockStateMockRecorder) Revert(blockNum, update, protocolVersion any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Revert", reflect.TypeOf((*MockState)(nil).Revert), blockNum, update)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Revert", reflect.TypeOf((*MockState)(nil).Revert), blockNum, update, protocolVersion)
 }
 
 // Update mocks base method.
-func (m *MockState) Update(blockNum uint64, update *core.StateUpdate, declaredClasses map[felt.Felt]core.ClassDefinition, skipVerifyNewRoot bool) error {
+func (m *MockState) Update(blockNum uint64, update *core.StateUpdate, declaredClasses map[felt.Felt]core.ClassDefinition, skipVerifyNewRoot bool, protocolVersion string) error {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "Update", blockNum, update, declaredClasses, skipVerifyNewRoot)
+	ret := m.ctrl.Call(m, "Update", blockNum, update, declaredClasses, skipVerifyNewRoot, protocolVersion)
 	ret0, _ := ret[0].(error)
 	return ret0
 }
 
 // Update indicates an expected call of Update.
-func (mr *MockStateMockRecorder) Update(blockNum, update, declaredClasses, skipVerifyNewRoot any) *gomock.Call {
+func (mr *MockStateMockRecorder) Update(blockNum, update, declaredClasses, skipVerifyNewRoot, protocolVersion any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Update", reflect.TypeOf((*MockState)(nil).Update), blockNum, update, declaredClasses, skipVerifyNewRoot)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Update", reflect.TypeOf((*MockState)(nil).Update), blockNum, update, declaredClasses, skipVerifyNewRoot, protocolVersion)
 }
