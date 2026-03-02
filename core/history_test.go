@@ -40,9 +40,9 @@ func TestStateHistory(t *testing.T) {
 				*addr: {*storageKey: initialStorage},
 			},
 		},
-	}, map[felt.Felt]core.ClassDefinition{*declaredCH: &core.SierraClass{}}, true))
+	}, map[felt.Felt]core.ClassDefinition{*declaredCH: &core.SierraClass{}}, true, ""))
 
-	root, err := state.Commitment()
+	root, err := state.Commitment("")
 	require.NoError(t, err)
 
 	require.NoError(t, state.Update(changeHeight, &core.StateUpdate{
@@ -55,7 +55,7 @@ func TestStateHistory(t *testing.T) {
 				*addr: {*storageKey: updatedStorage},
 			},
 		},
-	}, nil, true))
+	}, nil, true, ""))
 
 	snapshotBeforeDeployment := core.NewDeprecatedStateHistory(state, deployedHeight-1)
 	snapshotAtDeployment := core.NewDeprecatedStateHistory(state, deployedHeight)

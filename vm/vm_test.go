@@ -38,7 +38,7 @@ func TestCallDeprecatedCairo(t *testing.T) {
 		},
 	}, map[felt.Felt]core.ClassDefinition{
 		*classHash: simpleClass,
-	}, false))
+	}, false, ""))
 
 	entryPoint := felt.NewUnsafeFromString[felt.Felt]("0x39e11d48192e4333233c7eb19d10ad67c362bb28580c604d67884c85da39695")
 
@@ -75,7 +75,7 @@ func TestCallDeprecatedCairo(t *testing.T) {
 				},
 			},
 		},
-	}, nil, false))
+	}, nil, false, ""))
 
 	ret, err = New(&chainInfo, false, nil).Call(
 		&CallInfo{
@@ -119,7 +119,7 @@ func TestCallDeprecatedCairoMaxSteps(t *testing.T) {
 		},
 	}, map[felt.Felt]core.ClassDefinition{
 		*classHash: simpleClass,
-	}, false))
+	}, false, ""))
 
 	entryPoint := felt.NewUnsafeFromString[felt.Felt]("0x39e11d48192e4333233c7eb19d10ad67c362bb28580c604d67884c85da39695")
 	feeTokens := utils.DefaultFeeTokenAddresses
@@ -173,7 +173,7 @@ func TestCallCairo(t *testing.T) {
 		},
 	}
 	declaredClass := map[felt.Felt]core.ClassDefinition{*classHash: simpleClass}
-	require.NoError(t, state.Update(0, &firstStateUpdate, declaredClass, false))
+	require.NoError(t, state.Update(0, &firstStateUpdate, declaredClass, false, ""))
 
 	logLevel := utils.NewLogLevel(utils.ERROR)
 	log, err := utils.NewZapLogger(logLevel, false)
@@ -228,7 +228,7 @@ func TestCallCairo(t *testing.T) {
 			},
 		},
 	}
-	require.NoError(t, state.Update(1, &secondStateUpdate, nil, false))
+	require.NoError(t, state.Update(1, &secondStateUpdate, nil, false, ""))
 
 	ret, err = vm.Call(
 		&callInfo,
@@ -265,7 +265,7 @@ func TestCallInfoErrorHandling(t *testing.T) {
 		},
 	}, map[felt.Felt]core.ClassDefinition{
 		*classHash: simpleClass,
-	}, false))
+	}, false, ""))
 
 	logLevel := utils.NewLogLevel(utils.ERROR)
 	log, err := utils.NewZapLogger(logLevel, false)

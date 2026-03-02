@@ -74,7 +74,9 @@ func (s *DeprecatedState) ContractStorage(addr, key *felt.Felt) (felt.Felt, erro
 }
 
 // Root returns the state commitment.
-func (s *DeprecatedState) Commitment() (felt.Felt, error) {
+// protocolVersion controls the commitment formula: since v0.14.0, the Poseidon hash
+// is always applied even when classesRoot is zero.
+func (s *DeprecatedState) Commitment(protocolVersion string) (felt.Felt, error) {
 	var storageRoot, classesRoot felt.Felt
 
 	sStorage, closer, err := s.storage()
@@ -103,7 +105,12 @@ func (s *DeprecatedState) Commitment() (felt.Felt, error) {
 		return felt.Felt{}, err
 	}
 
-	if classesRoot.IsZero() {
+	if classesRoot.IsZero() && storageRoot.IsZero() {
+		return felt.Felt{}, nil
+	}
+
+	ver, _ := ParseBlockVersion(protocolVersion)
+	if classesRoot.IsZero() && ver.LessThan(Ver0_14_0) {
 		return storageRoot, nil
 	}
 
@@ -187,8 +194,8 @@ func (s *DeprecatedState) globalTrie(
 	return gTrie, closer, nil
 }
 
-func (s *DeprecatedState) verifyStateUpdateRoot(root *felt.Felt) error {
-	currentRoot, err := s.Commitment()
+func (s *DeprecatedState) verifyStateUpdateRoot(root *felt.Felt, protocolVersion string) error {
+	currentRoot, err := s.Commitment(protocolVersion)
 	if err != nil {
 		return err
 	}
@@ -210,8 +217,9 @@ func (s *DeprecatedState) Update(
 	update *StateUpdate,
 	declaredClasses map[felt.Felt]ClassDefinition,
 	skipVerifyNewRoot bool,
+	protocolVersion string,
 ) error {
-	err := s.verifyStateUpdateRoot(update.OldRoot)
+	err := s.verifyStateUpdateRoot(update.OldRoot, protocolVersion)
 	if err != nil {
 		return err
 	}
@@ -257,7 +265,7 @@ func (s *DeprecatedState) Update(
 		return nil
 	}
 
-	return s.verifyStateUpdateRoot(update.NewRoot)
+	return s.verifyStateUpdateRoot(update.NewRoot, protocolVersion)
 }
 
 var (
@@ -607,8 +615,8 @@ func (s *DeprecatedState) ContractDeployedAt(addr *felt.Felt, blockNumber uint64
 	return deployedAt <= blockNumber, nil
 }
 
-func (s *DeprecatedState) Revert(blockNumber uint64, update *StateUpdate) error {
-	err := s.verifyStateUpdateRoot(update.NewRoot)
+func (s *DeprecatedState) Revert(blockNumber uint64, update *StateUpdate, protocolVersion string) error {
+	err := s.verifyStateUpdateRoot(update.NewRoot, protocolVersion)
 	if err != nil {
 		return fmt.Errorf("verify state update root: %v", err)
 	}
@@ -661,7 +669,7 @@ func (s *DeprecatedState) Revert(blockNumber uint64, update *StateUpdate) error 
 		return err
 	}
 
-	return s.verifyStateUpdateRoot(update.OldRoot)
+	return s.verifyStateUpdateRoot(update.OldRoot, protocolVersion)
 }
 
 func (s *DeprecatedState) purgesystemContracts() error {
