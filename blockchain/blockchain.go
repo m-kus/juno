@@ -131,7 +131,18 @@ func (b *Blockchain) Network() *utils.Network {
 func (b *Blockchain) StateCommitment() (felt.Felt, error) {
 	b.listener.OnRead("StateCommitment")
 	batch := b.database.NewIndexedBatch() // this is a hack because we don't need to write to the db
-	return core.NewDeprecatedState(batch).Commitment()
+	height, err := core.GetChainHeight(batch)
+	if err != nil {
+		if errors.Is(err, db.ErrKeyNotFound) {
+			return felt.Felt{}, nil
+		}
+		return felt.Felt{}, err
+	}
+	header, err := core.GetBlockHeaderByNumber(batch, height)
+	if err != nil {
+		return felt.Felt{}, err
+	}
+	return core.NewDeprecatedState(batch).Commitment(header.ProtocolVersion)
 }
 
 // Height returns the latest block height. If blockchain is empty nil is returned.
@@ -317,7 +328,7 @@ func (b *Blockchain) Store(
 		}
 
 		state := core.NewDeprecatedState(txn)
-		err := state.Update(block.Number, stateUpdate, newClasses, false)
+		err := state.Update(block.Header, stateUpdate, newClasses, false)
 		if err != nil {
 			return err
 		}
@@ -687,18 +698,18 @@ func (b *Blockchain) revertHead(txn db.IndexedBatch) error {
 		return err
 	}
 
+	header, err := core.GetBlockHeaderByNumber(txn, blockNumber)
+	if err != nil {
+		return err
+	}
+
 	state := core.NewDeprecatedState(txn)
 	// revert state
-	if err = state.Revert(blockNumber, stateUpdate); err != nil {
+	if err = state.Revert(header, stateUpdate); err != nil {
 		return err
 	}
 
 	if err = revertCasmHashMetadata(txn, txn, stateUpdate); err != nil {
-		return err
-	}
-
-	header, err := core.GetBlockHeaderByNumber(txn, blockNumber)
-	if err != nil {
 		return err
 	}
 
@@ -832,19 +843,20 @@ func (b *Blockchain) updateStateRoots(
 	state := core.NewDeprecatedState(txn)
 
 	// Get old state root
-	oldStateRoot, err := state.Commitment()
+	oldStateRoot, err := state.Commitment(block.ProtocolVersion)
 	if err != nil {
 		return err
 	}
 	stateUpdate.OldRoot = &oldStateRoot
 
 	// Apply state update
-	if err = state.Update(block.Number, stateUpdate, newClasses, true); err != nil {
+	err = state.Update(block.Header, stateUpdate, newClasses, true)
+	if err != nil {
 		return err
 	}
 
 	// Get new state root
-	newStateRoot, err := state.Commitment()
+	newStateRoot, err := state.Commitment(block.ProtocolVersion)
 	if err != nil {
 		return err
 	}

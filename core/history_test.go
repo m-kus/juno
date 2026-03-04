@@ -30,7 +30,7 @@ func TestStateHistory(t *testing.T) {
 	deployedHeight := uint64(3)
 	changeHeight := uint64(10)
 
-	require.NoError(t, state.Update(deployedHeight, &core.StateUpdate{
+	require.NoError(t, state.Update(&core.Header{Number: deployedHeight}, &core.StateUpdate{
 		OldRoot: &felt.Zero,
 		NewRoot: &felt.Zero,
 		StateDiff: &core.StateDiff{
@@ -42,10 +42,10 @@ func TestStateHistory(t *testing.T) {
 		},
 	}, map[felt.Felt]core.ClassDefinition{*declaredCH: &core.SierraClass{}}, true))
 
-	root, err := state.Commitment()
+	root, err := state.Commitment("")
 	require.NoError(t, err)
 
-	require.NoError(t, state.Update(changeHeight, &core.StateUpdate{
+	require.NoError(t, state.Update(&core.Header{Number: changeHeight}, &core.StateUpdate{
 		OldRoot: &root,
 		NewRoot: &felt.Zero,
 		StateDiff: &core.StateDiff{

@@ -16,17 +16,18 @@ type State interface {
 	// Verifies state roots before and after the update.
 	// todo: change declaredClasses map[felt.Felt]ClassDefinition to map[felt.ClassHash]ClassDefinition
 	Update(
-		blockNum uint64,
+		header *Header,
 		update *StateUpdate,
 		declaredClasses map[felt.Felt]ClassDefinition,
 		skipVerifyNewRoot bool,
 	) error
 	// Revert rolls back the state update for blockNum, restoring the state to update.OldRoot.
 	// Requires the current root to match update.NewRoot.
-	Revert(blockNum uint64, update *StateUpdate) error
+	Revert(header *Header, update *StateUpdate) error
 	// Commitment returns the current state root hash, derived from the contracts and classes tries.
+	// protocolVersion controls the commitment formula: v0.14+ always uses Poseidon hash.
 	// todo: change return type from felt.Felt to felt.StateRootHash
-	Commitment() (felt.Felt, error)
+	Commitment(protocolVersion string) (felt.Felt, error)
 }
 
 //go:generate mockgen -destination=../mocks/mock_state_reader.go -package=mocks github.com/NethermindEth/juno/core StateReader

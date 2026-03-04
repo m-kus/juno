@@ -156,7 +156,7 @@ func (s *State) CompiledClassHashV2(
 }
 
 // Returns the state commitment
-func (s *State) Commitment() (felt.Felt, error) {
+func (s *State) Commitment(protocolVersion string) (felt.Felt, error) {
 	contractRoot, err := s.contractTrie.Hash()
 	if err != nil {
 		return felt.Felt{}, err
@@ -165,19 +165,21 @@ func (s *State) Commitment() (felt.Felt, error) {
 	if err != nil {
 		return felt.Felt{}, err
 	}
-	return stateCommitment(&contractRoot, &classRoot), nil
+	return stateCommitment(&contractRoot, &classRoot, protocolVersion), nil
 }
 
 // Applies a state update to a given state. If any error is encountered, state is not updated.
 // After a state update is applied, the root of the state must match the given new root in the state update.
 // TODO(weiihann): deal with flush atomicity
 func (s *State) Update(
-	blockNum uint64,
+	header *core.Header,
 	update *core.StateUpdate,
 	declaredClasses map[felt.Felt]core.ClassDefinition,
 	skipVerifyNewRoot bool,
 ) error {
-	if err := s.verifyComm(update.OldRoot); err != nil {
+	blockNum := header.Number
+	protocolVersion := header.ProtocolVersion
+	if err := s.verifyComm(update.OldRoot, protocolVersion); err != nil {
 		return err
 	}
 
@@ -226,7 +228,7 @@ func (s *State) Update(
 		return err
 	}
 
-	newComm, stateUpdate, err := s.commit()
+	newComm, stateUpdate, err := s.commit(protocolVersion)
 	if err != nil {
 		return err
 	}
@@ -259,9 +261,11 @@ func (s *State) Update(
 // Revert a given state update. The block number is the block number of the state update.
 //
 //nolint:gocyclo
-func (s *State) Revert(blockNum uint64, update *core.StateUpdate) error {
+func (s *State) Revert(header *core.Header, update *core.StateUpdate) error {
+	blockNum := header.Number
+	protocolVersion := header.ProtocolVersion
 	// Ensure the current root is the same as the new root
-	if err := s.verifyComm(update.NewRoot); err != nil {
+	if err := s.verifyComm(update.NewRoot, protocolVersion); err != nil {
 		return err
 	}
 
@@ -324,7 +328,7 @@ func (s *State) Revert(blockNum uint64, update *core.StateUpdate) error {
 		s.stateObjects[addr] = nil // mark for deletion
 	}
 
-	newComm, stateUpdate, err := s.commit()
+	newComm, stateUpdate, err := s.commit(protocolVersion)
 	if err != nil {
 		return err
 	}
@@ -399,7 +403,7 @@ func (s *State) GetReverseStateDiff(blockNum uint64, diff *core.StateDiff) (core
 }
 
 //nolint:gocyclo
-func (s *State) commit() (felt.Felt, stateUpdate, error) {
+func (s *State) commit(protocolVersion string) (felt.Felt, stateUpdate, error) {
 	// Sort in descending order of the number of storage changes
 	// so that we start with the heaviest update first
 	keys := slices.SortedStableFunc(maps.Keys(s.stateObjects), s.compareContracts)
@@ -496,7 +500,7 @@ func (s *State) commit() (felt.Felt, stateUpdate, error) {
 		return felt.Zero, emptyStateUpdate, err
 	}
 
-	newComm := stateCommitment(&contractRoot, &classRoot)
+	newComm := stateCommitment(&contractRoot, &classRoot, protocolVersion)
 
 	su := stateUpdate{
 		prevComm:      s.initRoot,
@@ -614,8 +618,8 @@ func (s *State) updateClassTrie(
 	return nil
 }
 
-func (s *State) verifyComm(comm *felt.Felt) error {
-	curComm, err := s.Commitment()
+func (s *State) verifyComm(comm *felt.Felt, protocolVersion string) error {
+	curComm, err := s.Commitment(protocolVersion)
 	if err != nil {
 		return err
 	}
@@ -845,9 +849,15 @@ func (s *State) compareContracts(a, b felt.Felt) int {
 	return len(contractB.dirtyStorage) - len(contractA.dirtyStorage)
 }
 
-// Calculate the commitment of the state
-func stateCommitment(contractRoot, classRoot *felt.Felt) felt.Felt {
-	if classRoot.IsZero() {
+// Calculate the commitment of the state.
+// Since v0.14.0, the Poseidon hash is always applied even when classRoot is zero.
+func stateCommitment(contractRoot, classRoot *felt.Felt, protocolVersion string) felt.Felt {
+	if classRoot.IsZero() && contractRoot.IsZero() {
+		return felt.Zero
+	}
+
+	ver, _ := core.ParseBlockVersion(protocolVersion)
+	if classRoot.IsZero() && ver.LessThan(core.Ver0_14_0) {
 		return *contractRoot
 	}
 
