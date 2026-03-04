@@ -819,7 +819,8 @@ func (b *Blockchain) updateStateRoots(
 	stateUpdate.OldRoot = &oldStateRoot
 
 	// Apply state update
-	if err = state.Update(block.Number, stateUpdate, newClasses, true, block.ProtocolVersion); err != nil {
+	err = state.Update(block.Number, stateUpdate, newClasses, true, block.ProtocolVersion)
+	if err != nil {
 		return err
 	}
 

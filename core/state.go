@@ -615,7 +615,9 @@ func (s *DeprecatedState) ContractDeployedAt(addr *felt.Felt, blockNumber uint64
 	return deployedAt <= blockNumber, nil
 }
 
-func (s *DeprecatedState) Revert(blockNumber uint64, update *StateUpdate, protocolVersion string) error {
+func (s *DeprecatedState) Revert(blockNumber uint64, update *StateUpdate,
+	protocolVersion string,
+) error {
 	err := s.verifyStateUpdateRoot(update.NewRoot, protocolVersion)
 	if err != nil {
 		return fmt.Errorf("verify state update root: %v", err)

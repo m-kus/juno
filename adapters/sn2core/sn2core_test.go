@@ -1,6 +1,7 @@
 package sn2core_test
 
 import (
+	"encoding/json"
 	"strconv"
 	"testing"
 
@@ -819,4 +820,70 @@ func assertPreConfirmedBlockReceipts(
 			}
 		}
 	}
+}
+
+func TestInvokeV3ProofFactsAdaptation(t *testing.T) {
+	// Raw feeder JSON for TX 0x2349c4dbaab86f974b09dfa70b4102a3addc7a6008cc2870a765f46b41612
+	// from block 1,310,364 on SN_INTEGRATION_SEPOLIA.
+	// This INVOKE v3 has 8-element proof_facts and empty signature.
+	rawJSON := `{
+		"transaction_hash": "0x2349c4dbaab86f974b09dfa70b4102a3addc7a6008cc2870a765f46b41612",
+		"version": "0x3",
+		"type": "INVOKE",
+		"sender_address": "0x37ee64c5681f8d1eea73429144d6a5c0ef271759a1d4342de13cef520fe35a7",
+		"nonce": "0x221",
+		"calldata": [
+			"0x70a5da4f557b77a9c54546e4bcc900806e28793d8e3eaaa207428d2387249b7",
+			"0x83afd3f4caedc6eebf44246fe54e38c95e3179a5ec9ea81740eca5b482d12e",
+			"0x3",
+			"0x48baf3ed1f0a03840186bd95063f63824d93bafd456439bfe667533437d9c91",
+			"0x1",
+			"0x0"
+		],
+		"signature": [],
+		"resource_bounds": {
+			"L1_GAS": {"max_amount": "0x186a0", "max_price_per_unit": "0x2386f26fc10000"},
+			"L2_GAS": {"max_amount": "0x47868c00", "max_price_per_unit": "0x174876e800"},
+			"L1_DATA_GAS": {"max_amount": "0x186a0", "max_price_per_unit": "0x2386f26fc10000"}
+		},
+		"tip": "0x0",
+		"nonce_data_availability_mode": 0,
+		"fee_data_availability_mode": 0,
+		"paymaster_data": [],
+		"account_deployment_data": [],
+		"proof_facts": [
+			"0x50524f4f4630",
+			"0x5649525455414c5f534e4f53",
+			"0x9743416d2d92b680d47338cb89f3def2e77ba772bbc2e568aeb48425e6c450",
+			"0x5649525455414c5f534e4f5330",
+			"0x13f996",
+			"0x3555db988bd793ca754f2346c563d118bece9cc3b7c95a0699ae2f77fe8682e",
+			"0x6989a681c469d769f3a706c56550a63741a4b2d32bef4b1209a26daad1dbb6",
+			"0x0"
+		]
+	}`
+
+	var feederTx starknet.Transaction
+	require.NoError(t, json.Unmarshal([]byte(rawJSON), &feederTx))
+
+	// Verify feeder deserialization preserved proof_facts.
+	require.NotNil(t, feederTx.ProofFacts)
+	require.Len(t, *feederTx.ProofFacts, 8, "feeder TX should have 8 proof_facts elements")
+
+	// Adapt to core type.
+	adapted, err := sn2core.AdaptTransaction(&feederTx)
+	require.NoError(t, err)
+	invoke, ok := adapted.(*core.InvokeTransaction)
+	require.True(t, ok, "expected *core.InvokeTransaction")
+	require.Len(t, invoke.ProofFacts, 8, "adapted TX should have 8 proof_facts elements")
+
+	// Verify transaction hash through the full pipeline.
+	network := utils.SepoliaIntegration
+	got, err := core.TransactionHash(invoke, &network)
+	require.NoError(t, err)
+
+	expectedHash := felt.UnsafeFromString[felt.Felt](
+		"0x2349c4dbaab86f974b09dfa70b4102a3addc7a6008cc2870a765f46b41612",
+	)
+	assert.Equal(t, expectedHash, got)
 }

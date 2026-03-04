@@ -352,3 +352,93 @@ func TestDeclareV0TransactionHash(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, *expectedHash, got)
 }
+
+func TestInvokeV3WithProofFacts(t *testing.T) {
+	// Transaction 0x2349c4dbaab86f974b09dfa70b4102a3addc7a6008cc2870a765f46b41612
+	// from block 1,310,364 on SN_INTEGRATION_SEPOLIA.
+	// This INVOKE v3 transaction includes a non-empty proof_facts field
+	// (VIRTUAL_SNOS proof) that must be hashed into the transaction hash.
+	network := utils.SepoliaIntegration
+
+	tx := &core.InvokeTransaction{
+		Version:       new(core.TransactionVersion).SetUint64(3),
+		SenderAddress: felt.NewUnsafeFromString[felt.Felt]("0x37ee64c5681f8d1eea73429144d6a5c0ef271759a1d4342de13cef520fe35a7"),
+		Nonce:         felt.NewUnsafeFromString[felt.Felt]("0x221"),
+		Tip:           0,
+		ResourceBounds: map[core.Resource]core.ResourceBounds{
+			core.ResourceL1Gas: {
+				MaxAmount:       0x186a0,
+				MaxPricePerUnit: felt.NewUnsafeFromString[felt.Felt]("0x2386f26fc10000"),
+			},
+			core.ResourceL2Gas: {
+				MaxAmount:       0x47868c00,
+				MaxPricePerUnit: felt.NewUnsafeFromString[felt.Felt]("0x174876e800"),
+			},
+			core.ResourceL1DataGas: {
+				MaxAmount:       0x186a0,
+				MaxPricePerUnit: felt.NewUnsafeFromString[felt.Felt]("0x2386f26fc10000"),
+			},
+		},
+		PaymasterData:         []*felt.Felt{},
+		AccountDeploymentData: []*felt.Felt{},
+		FeeDAMode:             core.DAModeL1,
+		NonceDAMode:           core.DAModeL1,
+		CallData: []*felt.Felt{
+			felt.NewUnsafeFromString[felt.Felt]("0x70a5da4f557b77a9c54546e4bcc900806e28793d8e3eaaa207428d2387249b7"),
+			felt.NewUnsafeFromString[felt.Felt]("0x83afd3f4caedc6eebf44246fe54e38c95e3179a5ec9ea81740eca5b482d12e"),
+			felt.NewUnsafeFromString[felt.Felt]("0x3"),
+			felt.NewUnsafeFromString[felt.Felt]("0x48baf3ed1f0a03840186bd95063f63824d93bafd456439bfe667533437d9c91"),
+			felt.NewUnsafeFromString[felt.Felt]("0x1"),
+			felt.NewUnsafeFromString[felt.Felt]("0x0"),
+		},
+		ProofFacts: []*felt.Felt{
+			felt.NewUnsafeFromString[felt.Felt]("0x50524f4f4630"),
+			felt.NewUnsafeFromString[felt.Felt]("0x5649525455414c5f534e4f53"),
+			felt.NewUnsafeFromString[felt.Felt]("0x9743416d2d92b680d47338cb89f3def2e77ba772bbc2e568aeb48425e6c450"),
+			felt.NewUnsafeFromString[felt.Felt]("0x5649525455414c5f534e4f5330"),
+			felt.NewUnsafeFromString[felt.Felt]("0x13f996"),
+			felt.NewUnsafeFromString[felt.Felt]("0x3555db988bd793ca754f2346c563d118bece9cc3b7c95a0699ae2f77fe8682e"),
+			felt.NewUnsafeFromString[felt.Felt]("0x6989a681c469d769f3a706c56550a63741a4b2d32bef4b1209a26daad1dbb6"),
+			felt.NewUnsafeFromString[felt.Felt]("0x0"),
+		},
+	}
+
+	expectedHash := felt.UnsafeFromString[felt.Felt](
+		"0x2349c4dbaab86f974b09dfa70b4102a3addc7a6008cc2870a765f46b41612",
+	)
+
+	got, err := core.TransactionHash(tx, &network)
+	require.NoError(t, err)
+	assert.Equal(t, expectedHash, got)
+}
+
+func TestInvokeV3ProofFactsCBORRoundtrip(t *testing.T) {
+	tx := &core.InvokeTransaction{
+		TransactionHash: new(felt.Felt).SetUint64(1),
+		Version:         new(core.TransactionVersion).SetUint64(3),
+		SenderAddress:   new(felt.Felt).SetUint64(2),
+		Nonce:           new(felt.Felt).SetUint64(3),
+		CallData:        []*felt.Felt{new(felt.Felt).SetUint64(4)},
+		ProofFacts: []*felt.Felt{
+			felt.NewUnsafeFromString[felt.Felt]("0x50524f4f4630"),
+			felt.NewUnsafeFromString[felt.Felt]("0x5649525455414c5f534e4f53"),
+			new(felt.Felt).SetUint64(0),
+		},
+		ResourceBounds: map[core.Resource]core.ResourceBounds{
+			core.ResourceL1Gas:     {MaxAmount: 0, MaxPricePerUnit: new(felt.Felt)},
+			core.ResourceL2Gas:     {MaxAmount: 0, MaxPricePerUnit: new(felt.Felt)},
+			core.ResourceL1DataGas: {MaxAmount: 0, MaxPricePerUnit: new(felt.Felt)},
+		},
+	}
+
+	data, err := encoder.Marshal(tx)
+	require.NoError(t, err)
+
+	var decoded core.Transaction
+	require.NoError(t, encoder.Unmarshal(data, &decoded))
+
+	invoke, ok := decoded.(*core.InvokeTransaction)
+	require.True(t, ok)
+	require.Len(t, invoke.ProofFacts, 3, "proof_facts should survive CBOR roundtrip")
+	assert.Equal(t, tx.ProofFacts, invoke.ProofFacts)
+}

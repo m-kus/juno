@@ -491,9 +491,18 @@ func invokeTransactionHash(i *InvokeTransaction, n *utils.Network) (felt.Felt, e
 		if len(i.ProofFacts) > 0 {
 			proofFactsHash := crypto.PoseidonArray(i.ProofFacts...)
 			hashElems = append(hashElems, &proofFactsHash)
+			fmt.Printf("[DEBUG-TXHASH] invoke v3 with proof_facts: count=%d proofFactsHash=%s\n",
+				len(i.ProofFacts), proofFactsHash.String())
 		}
 
-		return crypto.PoseidonArray(hashElems...), nil
+		for idx, e := range hashElems {
+			fmt.Printf("[DEBUG-TXHASH] hashElems[%d] = %s\n", idx, e.String())
+		}
+		result := crypto.PoseidonArray(hashElems...)
+		fmt.Printf("[DEBUG-TXHASH] invoke v3 final hash=%s nonce=%s sender=%s sig=%d calldata=%d\n",
+			result.String(), i.Nonce, i.SenderAddress, len(i.TransactionSignature), len(i.CallData))
+
+		return result, nil
 	default:
 		return felt.Felt{}, errInvalidTransactionVersion(i, i.Version)
 	}
@@ -682,7 +691,15 @@ func VerifyTransactions(txs []Transaction, n *utils.Network, protocolVersion str
 			return fmt.Errorf("cannot calculate transaction hash of Transaction %s, reason: %w", t.Hash(), hErr)
 		}
 		if !calculatedTxHash.Equal(t.Hash()) {
-			return fmt.Errorf("cannot verify transaction hash of Transaction %s", t.Hash())
+			extra := ""
+			if invoke, ok := t.(*InvokeTransaction); ok {
+				extra = fmt.Sprintf(
+					", version: %s, proofFacts: %d, signature: %d, calldata: %d, nonce: %s, sender: %s",
+					invoke.Version.AsFelt(), len(invoke.ProofFacts), len(invoke.TransactionSignature),
+					len(invoke.CallData), invoke.Nonce, invoke.SenderAddress,
+				)
+			}
+			return fmt.Errorf("cannot verify transaction hash of Transaction %s (computed: %s%s)", t.Hash(), calculatedTxHash.String(), extra)
 		}
 	}
 	return nil
