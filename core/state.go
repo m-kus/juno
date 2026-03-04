@@ -213,12 +213,13 @@ func (s *DeprecatedState) verifyStateUpdateRoot(root *felt.Felt, protocolVersion
 // old or new root does not match the state's old or new roots,
 // [ErrMismatchedRoot] is returned.
 func (s *DeprecatedState) Update(
-	blockNumber uint64,
+	header *Header,
 	update *StateUpdate,
 	declaredClasses map[felt.Felt]ClassDefinition,
 	skipVerifyNewRoot bool,
-	protocolVersion string,
 ) error {
+	blockNumber := header.Number
+	protocolVersion := header.ProtocolVersion
 	err := s.verifyStateUpdateRoot(update.OldRoot, protocolVersion)
 	if err != nil {
 		return err
@@ -616,8 +617,10 @@ func (s *DeprecatedState) ContractDeployedAt(addr *felt.Felt, blockNumber uint64
 }
 
 func (s *DeprecatedState) Revert(
-	blockNumber uint64, update *StateUpdate, protocolVersion string,
+	header *Header, update *StateUpdate,
 ) error {
+	blockNumber := header.Number
+	protocolVersion := header.ProtocolVersion
 	err := s.verifyStateUpdateRoot(update.NewRoot, protocolVersion)
 	if err != nil {
 		return fmt.Errorf("verify state update root: %v", err)

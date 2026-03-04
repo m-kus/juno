@@ -172,12 +172,13 @@ func (s *State) Commitment(protocolVersion string) (felt.Felt, error) {
 // After a state update is applied, the root of the state must match the given new root in the state update.
 // TODO(weiihann): deal with flush atomicity
 func (s *State) Update(
-	blockNum uint64,
+	header *core.Header,
 	update *core.StateUpdate,
 	declaredClasses map[felt.Felt]core.ClassDefinition,
 	skipVerifyNewRoot bool,
-	protocolVersion string,
 ) error {
+	blockNum := header.Number
+	protocolVersion := header.ProtocolVersion
 	if err := s.verifyComm(update.OldRoot, protocolVersion); err != nil {
 		return err
 	}
@@ -260,7 +261,9 @@ func (s *State) Update(
 // Revert a given state update. The block number is the block number of the state update.
 //
 //nolint:gocyclo
-func (s *State) Revert(blockNum uint64, update *core.StateUpdate, protocolVersion string) error {
+func (s *State) Revert(header *core.Header, update *core.StateUpdate) error {
+	blockNum := header.Number
+	protocolVersion := header.ProtocolVersion
 	// Ensure the current root is the same as the new root
 	if err := s.verifyComm(update.NewRoot, protocolVersion); err != nil {
 		return err

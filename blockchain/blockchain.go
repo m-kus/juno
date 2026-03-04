@@ -328,7 +328,7 @@ func (b *Blockchain) Store(
 		}
 
 		state := core.NewDeprecatedState(txn)
-		err := state.Update(block.Number, stateUpdate, newClasses, false, block.ProtocolVersion)
+		err := state.Update(block.Header, stateUpdate, newClasses, false)
 		if err != nil {
 			return err
 		}
@@ -705,7 +705,7 @@ func (b *Blockchain) revertHead(txn db.IndexedBatch) error {
 
 	state := core.NewDeprecatedState(txn)
 	// revert state
-	if err = state.Revert(blockNumber, stateUpdate, header.ProtocolVersion); err != nil {
+	if err = state.Revert(header, stateUpdate); err != nil {
 		return err
 	}
 
@@ -850,7 +850,7 @@ func (b *Blockchain) updateStateRoots(
 	stateUpdate.OldRoot = &oldStateRoot
 
 	// Apply state update
-	err = state.Update(block.Number, stateUpdate, newClasses, true, block.ProtocolVersion)
+	err = state.Update(block.Header, stateUpdate, newClasses, true)
 	if err != nil {
 		return err
 	}
