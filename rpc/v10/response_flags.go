@@ -6,7 +6,8 @@ import (
 )
 
 type ResponseFlags struct {
-	IncludeProofFacts bool
+	IncludeProofFacts      bool
+	IncludeLastUpdateBlock bool
 }
 
 func (r *ResponseFlags) UnmarshalJSON(data []byte) error {
@@ -20,6 +21,8 @@ func (r *ResponseFlags) UnmarshalJSON(data []byte) error {
 		switch flag {
 		case "INCLUDE_PROOF_FACTS":
 			r.IncludeProofFacts = true
+		case "INCLUDE_LAST_UPDATE_BLOCK":
+			r.IncludeLastUpdateBlock = true
 		default:
 			return fmt.Errorf("unknown flag: %s", flag)
 		}

@@ -1,6 +1,7 @@
 package blockchain
 
 import (
+	"encoding/binary"
 	"errors"
 	"fmt"
 
@@ -54,6 +55,8 @@ type Reader interface {
 	HeadState() (core.StateReader, StateCloser, error)
 	StateAtBlockHash(blockHash *felt.Felt) (core.StateReader, StateCloser, error)
 	StateAtBlockNumber(blockNumber uint64) (core.StateReader, StateCloser, error)
+
+	ContractStorageLastUpdate(addr, key *felt.Felt, blockNum uint64) (felt.Felt, uint64, error)
 
 	BlockCommitmentsByNumber(blockNumber uint64) (*core.BlockCommitments, error)
 
@@ -634,6 +637,53 @@ func (b *Blockchain) StateAtBlockHash(
 		core.NewDeprecatedState(txn),
 		header.Number,
 	), noopStateCloser, nil
+}
+
+// ContractStorageLastUpdate returns the storage value and the block number at which it was last modified.
+// It queries the ContractStorageHistory bucket which stores values keyed by (addr, key, block_number).
+func (b *Blockchain) ContractStorageLastUpdate(addr, key *felt.Felt, blockNum uint64) (felt.Felt, uint64, error) {
+	b.listener.OnRead("ContractStorageLastUpdate")
+	prefix := db.ContractStorageHistoryKey(addr, key)
+
+	it, err := b.database.NewIterator(prefix, true)
+	if err != nil {
+		return felt.Zero, 0, err
+	}
+	defer it.Close()
+
+	seekKey := binary.BigEndian.AppendUint64(prefix, blockNum)
+	if !it.Seek(seekKey) {
+		return felt.Zero, 0, nil
+	}
+
+	iterKey := it.Key()
+	keyBlockNum := binary.BigEndian.Uint64(iterKey[len(prefix):])
+	if keyBlockNum == blockNum {
+		val, err := it.Value()
+		if err != nil {
+			return felt.Zero, 0, err
+		}
+		var result felt.Felt
+		result.SetBytes(val)
+		return result, keyBlockNum, nil
+	}
+
+	// Move backwards to find the most recent entry before blockNum
+	if !it.Prev() {
+		return felt.Zero, 0, nil
+	}
+
+	prevKey := it.Key()
+	prevBlockNum := binary.BigEndian.Uint64(prevKey[len(prefix):])
+
+	val, err := it.Value()
+	if err != nil {
+		return felt.Zero, 0, err
+	}
+
+	var result felt.Felt
+	result.SetBytes(val)
+	return result, prevBlockNum, nil
 }
 
 // EventFilter returns an EventFilter object that is tied to a snapshot of the blockchain
