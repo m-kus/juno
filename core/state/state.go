@@ -714,6 +714,24 @@ func (s *State) ContractStorageAt(addr, key *felt.Felt, blockNum uint64) (felt.F
 	return s.getHistoricalValue(prefix, blockNum)
 }
 
+// ContractStorageLastUpdate returns the storage value and the block number at which it was last modified.
+// If the key was never set, it returns zero value and block number 0.
+func (s *State) ContractStorageLastUpdate(addr, key *felt.Felt, blockNum uint64) (felt.Felt, uint64, error) {
+	prefix := db.ContractStorageHistoryKey(addr, key)
+	var ret felt.Felt
+	lastUpdate, err := s.valueAtWithBlockNum(prefix, blockNum, func(val []byte) error {
+		ret.SetBytes(val)
+		return nil
+	})
+	if err != nil {
+		if errors.Is(err, ErrNoHistoryValue) {
+			return felt.Zero, 0, nil
+		}
+		return felt.Zero, 0, err
+	}
+	return ret, lastUpdate, nil
+}
+
 // Returns the nonce of a contract at a given block number.
 func (s *State) ContractNonceAt(addr *felt.Felt, blockNum uint64) (felt.Felt, error) {
 	prefix := db.ContractNonceHistoryKey(addr)
@@ -796,6 +814,44 @@ func (s *State) valueAt(prefix []byte, blockNum uint64, cb func(val []byte) erro
 	}
 
 	return cb(val)
+}
+
+// valueAtWithBlockNum is like valueAt but also returns the block number of the matched entry.
+func (s *State) valueAtWithBlockNum(prefix []byte, blockNum uint64, cb func(val []byte) error) (uint64, error) {
+	it, err := s.db.disk.NewIterator(prefix, true)
+	if err != nil {
+		return 0, err
+	}
+	defer it.Close()
+
+	seekKey := binary.BigEndian.AppendUint64(prefix, blockNum)
+	if !it.Seek(seekKey) {
+		return 0, ErrNoHistoryValue
+	}
+
+	key := it.Key()
+	keyBlockNum := binary.BigEndian.Uint64(key[len(prefix):])
+	if keyBlockNum == blockNum {
+		val, err := it.Value()
+		if err != nil {
+			return 0, err
+		}
+		return keyBlockNum, cb(val)
+	}
+
+	if !it.Prev() {
+		return 0, ErrNoHistoryValue
+	}
+
+	prevKey := it.Key()
+	prevBlockNum := binary.BigEndian.Uint64(prevKey[len(prefix):])
+
+	val, err := it.Value()
+	if err != nil {
+		return 0, err
+	}
+
+	return prevBlockNum, cb(val)
 }
 
 func (s *State) deleteHistory(blockNum uint64, diff *core.StateDiff) error {
