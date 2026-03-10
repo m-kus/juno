@@ -5,7 +5,7 @@ import (
 	"time"
 )
 
-// StartIntervalLogger starts a goroutine that calls the provided function at regular intervals
+// CallEveryInterval starts a goroutine that calls the provided function at regular intervals
 func CallEveryInterval(ctx context.Context, interval time.Duration, fn func()) context.CancelFunc {
 	loggerCtx, cancel := context.WithCancel(ctx)
 	go func() {

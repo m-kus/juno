@@ -289,6 +289,7 @@ func main() {
 	})
 
 	if err := cmd.ExecuteContext(ctx); err != nil {
+		cancel()
 		os.Exit(1)
 	}
 }
