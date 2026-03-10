@@ -244,12 +244,7 @@ func getContractProof(
 			return nil, err
 		}
 
-		root, err := t.Hash()
-		if err != nil {
-			return nil, err
-		}
-
-		nonce, err := state.ContractNonce(&contract)
+		classHash, err := state.ContractClassHash(&contract)
 		if err != nil {
 			if errors.Is(err, db.ErrKeyNotFound) { // contract does not exist, skip getting leaf data
 				continue
@@ -257,7 +252,17 @@ func getContractProof(
 			return nil, err
 		}
 
-		classHash, err := state.ContractClassHash(&contract)
+		nonce, err := state.ContractNonce(&contract)
+		if err != nil {
+			return nil, err
+		}
+
+		contractStorageTrie, err := state.ContractStorageTrie(&contract)
+		if err != nil {
+			return nil, err
+		}
+
+		storageRoot, err := contractStorageTrie.Hash()
 		if err != nil {
 			return nil, err
 		}
@@ -265,7 +270,7 @@ func getContractProof(
 		contractLeavesData[i] = &LeafData{
 			Nonce:       &nonce,
 			ClassHash:   &classHash,
-			StorageRoot: &root,
+			StorageRoot: &storageRoot,
 		}
 	}
 
