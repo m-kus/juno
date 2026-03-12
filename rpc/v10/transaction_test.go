@@ -1938,3 +1938,142 @@ func createBaseInvokeTransactionV3() core.InvokeTransaction {
 		AccountDeploymentData: []*felt.Felt{},
 	}
 }
+
+func TestResourceBoundsValidation(t *testing.T) {
+	const invalidInvokeV3 = `{
+		"type": "INVOKE",
+		"sender_address": "0xf9e998b2853e6d01f3ae3c598c754c1b9a7bd398fec7657de022f3b778679",
+		"calldata": [
+			"0x1",
+			"0x41a78e741e5af2fec34b695679bc6891742439f7afb8484ecd7766661ad02bf",
+			"0x1987cbd17808b9a23693d4de7e246a443cfe37e6e7fbaeabd7d7e6532b07c3d",
+			"0x4",
+			"0x16342ade8a7cc8296920731bc34b5a6530f5ee1dc1bfd3cc83cb3f519d6530a",
+			"0x65d7d6a3cd92f5d836fc410db222801cf70c6966bf5c0dc4d25699def10f4e9",
+			"0x1",
+			"0x0"
+		],
+		"version": "0x3",
+		"signature": [],
+		"nonce": "0x00000000000000000000000000000000000000000000000000000000000077d8",
+		"resource_bounds": {
+			"l2_gas": {
+				"max_amount": "0x0",
+				"max_price_per_unit": "0x0"
+			},
+			"l1_gas": {
+				"max_amount": "0x0",
+				"max_price_per_unit": "0x0"
+			}
+		},
+		"tip": "0x0",
+		"paymaster_data": [],
+		"nonce_data_availability_mode": "L1",
+		"fee_data_availability_mode": "L1",
+		"account_deployment_data": []
+	}`
+	const validInvokeV3 = `{
+		"type": "INVOKE",
+		"sender_address": "0xf9e998b2853e6d01f3ae3c598c754c1b9a7bd398fec7657de022f3b778679",
+		"calldata": [
+			"0x1",
+			"0x41a78e741e5af2fec34b695679bc6891742439f7afb8484ecd7766661ad02bf",
+			"0x1987cbd17808b9a23693d4de7e246a443cfe37e6e7fbaeabd7d7e6532b07c3d",
+			"0x4",
+			"0x16342ade8a7cc8296920731bc34b5a6530f5ee1dc1bfd3cc83cb3f519d6530a",
+			"0x65d7d6a3cd92f5d836fc410db222801cf70c6966bf5c0dc4d25699def10f4e9",
+			"0x1",
+			"0x0"
+		],
+		"version": "0x3",
+		"signature": [],
+		"nonce": "0x00000000000000000000000000000000000000000000000000000000000077d8",
+		"resource_bounds": {
+			"l2_gas": {
+				"max_amount": "0x0",
+				"max_price_per_unit": "0x0"
+			},
+			"l1_gas": {
+				"max_amount": "0x0",
+				"max_price_per_unit": "0x0"
+			},
+			"l1_data_gas": {
+			"max_amount": "0x0",
+				"max_price_per_unit": "0x0"
+			}
+		},
+		"tip": "0x0",
+		"paymaster_data": [],
+		"nonce_data_availability_mode": "L1",
+		"fee_data_availability_mode": "L1",
+		"account_deployment_data": []
+	}`
+	const invokeV1 = `{
+		"type": "INVOKE",
+		"sender_address": "0x4a7876e03402cf253efdb3b17c760ee7349c7ec2876059b83ec2c92ca451e16",
+		"calldata": [
+			"0x1",
+			"0x3745ab04a431fc02871a139be6b93d9260b0ff3e779ad9c8b377183b23109f1",
+			"0x6a26462a114fa5e0c0e6b9cd8442c79e1ad560232e65427e16de301eb99b89",
+			"0x0"
+		],
+		"max_fee": "0x0",
+		"version": "0x100000000000000000000000000000001",
+		"signature": [],
+		"nonce": "0x34f6"
+	}`
+
+	tests := []struct {
+		name        string
+		txnJSON     string
+		wantErr     bool
+		expectedErr []string
+	}{
+		{
+			name:    "invalid v3 - resource_bounds not fully populated",
+			txnJSON: invalidInvokeV3,
+			wantErr: true,
+			expectedErr: []string{
+				"'L1DataGas' failed on the 'required' tag",
+			},
+		},
+		{
+			name:        "valid v3 - resource_bounds fully populated",
+			txnJSON:     validInvokeV3,
+			wantErr:     false,
+			expectedErr: []string{},
+		},
+		{
+			name:    "valid v1 - rejected as not supported",
+			txnJSON: invokeV1,
+			wantErr: true,
+			expectedErr: []string{
+				"'Version' failed on the 'version_0x3' tag",
+				"'ResourceBounds' failed on the 'resource_bounds_required' tag",
+				"'Tip' failed on the 'required' tag",
+				"'PaymasterData' failed on the 'required' tag",
+				"'AccountDeploymentData' failed on the 'required_if' tag",
+				"'NonceDAMode' failed on the 'required' tag",
+				"'FeeDAMode' failed on the 'required' tag",
+			},
+		},
+	}
+
+	validate := validator.Validator()
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			var txn rpcv10.Transaction
+			require.NoError(t, json.Unmarshal([]byte(tt.txnJSON), &txn))
+
+			err := validate.Struct(txn)
+			if tt.wantErr {
+				for _, line := range tt.expectedErr {
+					assert.ErrorContains(t, err, line, "")
+				}
+			} else {
+				assert.NoError(t, err, "Expected validation to pass, but it failed")
+			}
+		})
+	}
+}
