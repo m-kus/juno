@@ -9,6 +9,7 @@ You can run a Juno node using several methods:
 - [Docker container](#docker-container)
 - [Standalone binary](#standalone-binary)
 - [Building from source](#building-from-source)
+- [Kubernetes with Helm](running-on-kubernetes)
 - [Google Cloud Platform (GCP)](running-on-gcp)
 
 :::tip
@@ -167,4 +168,3 @@ mkdir -p $HOME/snapshots
 :::tip
 To learn how to configure Juno, check out the [Configuring Juno](configuring) guide.
 :::
-
