@@ -192,6 +192,7 @@ func (d *Database) Update(
 	blockNum uint64,
 	mergedClassNodes *trienode.MergeNodeSet,
 	mergedContractNodes *trienode.MergeNodeSet,
+	_ db.Batch, // added for interface compatibility, not used
 ) error {
 	d.lock.Lock()
 	defer d.lock.Unlock()

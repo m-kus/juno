@@ -6,7 +6,6 @@ import (
 	"github.com/NethermindEth/juno/core/state"
 	"github.com/NethermindEth/juno/core/trie2/triedb/database"
 	"github.com/NethermindEth/juno/db"
-	"github.com/NethermindEth/juno/db/memory"
 )
 
 type StateFactory struct {
@@ -35,17 +34,18 @@ func (sf *StateFactory) NewState(
 	// todo: this should be *felt.StateRootHash
 	stateRoot *felt.Felt,
 	txn db.IndexedBatch,
+	batch db.Batch,
 ) (core.State, error) {
 	if !sf.UseNewState {
 		deprecatedState := core.NewDeprecatedState(txn)
 		return deprecatedState, nil
 	}
 
-	stateState, err := state.New(stateRoot, sf.stateDB)
+	state, err := state.New(stateRoot, sf.stateDB, batch)
 	if err != nil {
 		return nil, err
 	}
-	return stateState, nil
+	return state, nil
 }
 
 func (sf *StateFactory) NewStateReader(
@@ -64,18 +64,4 @@ func (sf *StateFactory) NewStateReader(
 		return nil, err
 	}
 	return &history, nil
-}
-
-func (sf *StateFactory) EmptyState() (core.StateReader, error) {
-	if !sf.UseNewState {
-		memDB := memory.New()
-		txn := memDB.NewIndexedBatch()
-		emptyState := core.NewDeprecatedState(txn)
-		return emptyState, nil
-	}
-	state, err := state.New(&felt.Zero, sf.stateDB)
-	if err != nil {
-		return nil, err
-	}
-	return state, nil
 }

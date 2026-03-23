@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/NethermindEth/juno/core/felt"
+	"github.com/NethermindEth/juno/core/trie2/triedb/database"
 	"github.com/NethermindEth/juno/core/trie2/trienode"
 	"github.com/NethermindEth/juno/core/trie2/trieutils"
 	"github.com/NethermindEth/juno/db"
@@ -148,14 +149,17 @@ func TestRawDB(t *testing.T) {
 			}
 		}
 
+		batch := memDB.NewBatch()
 		err := database.Update(
 			&felt.StateRootHash{},
 			&felt.StateRootHash{},
 			1,
 			createMergeNodeSet(basicClassNodes),
 			createContractMergeNodeSet(allContractNodes),
+			batch,
 		)
 		require.NoError(t, err)
+		require.NoError(t, batch.Write())
 
 		classID := trieutils.NewClassTrieID(felt.StateRootHash{})
 		verifyNode(t, database, classID, &rootPath, rootNode)
@@ -173,14 +177,17 @@ func TestRawDB(t *testing.T) {
 		memDB := memory.New()
 		database := New(memDB)
 
+		batch := memDB.NewBatch()
 		err := database.Update(
 			&felt.StateRootHash{},
 			&felt.StateRootHash{},
 			1,
 			createMergeNodeSet(basicClassNodes),
 			nil,
+			batch,
 		)
 		require.NoError(t, err)
+		require.NoError(t, batch.Write())
 
 		classID := trieutils.NewClassTrieID(felt.StateRootHash{})
 		verifyNode(t, database, classID, &leaf1Path, leaf1Node)
@@ -189,14 +196,17 @@ func TestRawDB(t *testing.T) {
 			leaf1Path: trienode.NewDeleted(true),
 		}
 
+		batch = memDB.NewBatch()
 		err = database.Update(
 			&felt.StateRootHash{},
 			&felt.StateRootHash{},
 			2,
 			createMergeNodeSet(deletedNodes),
 			nil,
+			batch,
 		)
 		require.NoError(t, err)
+		require.NoError(t, batch.Write())
 
 		reader, err := database.NodeReader(classID)
 		require.NoError(t, err)
@@ -217,14 +227,17 @@ func TestRawDB(t *testing.T) {
 		memDB := memory.New()
 		database := New(memDB)
 
+		batch := memDB.NewBatch()
 		err := database.Update(
 			&felt.StateRootHash{},
 			&felt.StateRootHash{},
 			1,
 			createMergeNodeSet(basicClassNodes),
 			nil,
+			batch,
 		)
 		require.NoError(t, err)
+		require.NoError(t, batch.Write())
 
 		classID := trieutils.NewClassTrieID(felt.StateRootHash{})
 		reader, err := database.NodeReader(classID)
@@ -247,14 +260,17 @@ func TestRawDB(t *testing.T) {
 		memDB := memory.New()
 		database := New(memDB)
 
+		batch := memDB.NewBatch()
 		err := database.Update(
 			&felt.StateRootHash{},
 			&felt.StateRootHash{},
 			1,
 			createMergeNodeSet(basicClassNodes),
 			nil,
+			batch,
 		)
 		require.NoError(t, err)
+		require.NoError(t, batch.Write())
 
 		classID := trieutils.NewClassTrieID(felt.StateRootHash{})
 		verifyNode(t, database, classID, &rootPath, rootNode)
@@ -269,14 +285,17 @@ func TestRawDB(t *testing.T) {
 			newLeafPath: newLeafNode,
 		}
 
+		batch = memDB.NewBatch()
 		err = database.Update(
 			&felt.StateRootHash{},
 			&felt.StateRootHash{},
 			2,
 			createMergeNodeSet(newNodes),
 			nil,
+			batch,
 		)
 		require.NoError(t, err)
+		require.NoError(t, batch.Write())
 
 		verifyNode(t, database, classID, &newLeafPath, newLeafNode)
 		verifyNode(t, database, classID, &rootPath, rootNode)
@@ -284,18 +303,97 @@ func TestRawDB(t *testing.T) {
 		verifyNode(t, database, classID, &leaf2Path, leaf2Node)
 	})
 
+	t.Run("Scheme returns RawScheme", func(t *testing.T) {
+		db := New(memory.New())
+		assert.Equal(t, database.RawScheme, db.Scheme())
+	})
+
+	t.Run("NewIterator", func(t *testing.T) {
+		t.Run("empty db returns invalid iterator", func(t *testing.T) {
+			database := New(memory.New())
+			id := trieutils.NewClassTrieID(felt.StateRootHash{})
+			iter, err := database.NewIterator(id)
+			require.NoError(t, err)
+			assert.False(t, iter.Valid())
+		})
+
+		t.Run("class trie without owner", func(t *testing.T) {
+			memDB := memory.New()
+			database := New(memDB)
+
+			batch := memDB.NewBatch()
+			err := database.Update(
+				&felt.StateRootHash{},
+				&felt.StateRootHash{},
+				1,
+				createMergeNodeSet(basicClassNodes),
+				nil,
+				batch,
+			)
+			require.NoError(t, err)
+			require.NoError(t, batch.Write())
+
+			id := trieutils.NewClassTrieID(felt.StateRootHash{})
+			iter, err := database.NewIterator(id)
+			require.NoError(t, err)
+
+			prefix := db.ClassTrie.Key()
+			assert.True(t, iter.First())
+			assert.True(t, len(iter.Key()) >= len(prefix))
+			assert.Equal(t, prefix, iter.Key()[:len(prefix)])
+		})
+
+		t.Run("contract storage trie with owner", func(t *testing.T) {
+			memDB := memory.New()
+			database := New(memDB)
+
+			owner := felt.NewFromUint64[felt.Address](42)
+			storageNodes := map[felt.Address]map[trieutils.Path]trienode.TrieNode{
+				*owner: {leaf1Path: leaf1Node},
+			}
+
+			batch := memDB.NewBatch()
+			err := database.Update(
+				&felt.StateRootHash{},
+				&felt.StateRootHash{},
+				1,
+				nil,
+				createContractMergeNodeSet(storageNodes),
+				batch,
+			)
+			require.NoError(t, err)
+			require.NoError(t, batch.Write())
+
+			id := trieutils.NewContractStorageTrieID(felt.StateRootHash{}, *owner)
+			iter, err := database.NewIterator(id)
+			require.NoError(t, err)
+
+			bucketKey := db.ContractTrieStorage.Key()
+			ownerBytes := owner.Bytes()
+			expectedPrefix := make([]byte, 0, len(bucketKey)+len(ownerBytes))
+			expectedPrefix = append(expectedPrefix, bucketKey...)
+			expectedPrefix = append(expectedPrefix, ownerBytes[:]...)
+			assert.True(t, iter.First())
+			assert.True(t, len(iter.Key()) >= len(expectedPrefix))
+			assert.Equal(t, expectedPrefix, iter.Key()[:len(expectedPrefix)])
+		})
+	})
+
 	t.Run("Concurrent reads", func(t *testing.T) {
 		memDB := memory.New()
 		database := New(memDB)
 
+		batch := memDB.NewBatch()
 		err := database.Update(
 			&felt.StateRootHash{},
 			&felt.StateRootHash{},
 			1,
 			createMergeNodeSet(basicClassNodes),
 			nil,
+			batch,
 		)
 		require.NoError(t, err)
+		require.NoError(t, batch.Write())
 
 		classID := trieutils.NewClassTrieID(felt.StateRootHash{})
 		owner := felt.Address{}

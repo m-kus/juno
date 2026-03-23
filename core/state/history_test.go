@@ -143,9 +143,11 @@ func TestStateHistoryClassOperations(t *testing.T) {
 		NewRoot:   &felt.Zero,
 		StateDiff: &core.StateDiff{},
 	}
-	state, err := New(&felt.Zero, stateDB)
+	batch := stateDB.disk.NewBatch()
+	state, err := New(&felt.Zero, stateDB, batch)
 	require.NoError(t, err)
 	err = state.Update(&core.Header{Number: 0}, stateUpdate, classes, false)
+	require.NoError(t, batch.Write())
 	require.NoError(t, err)
 	stateComm, err := state.Commitment("")
 	require.NoError(t, err)
@@ -159,10 +161,12 @@ func TestStateHistoryClassOperations(t *testing.T) {
 		class2Hash: class2,
 	}
 
-	state, err = New(&stateComm, stateDB)
+	batch = stateDB.disk.NewBatch()
+	state, err = New(&stateComm, stateDB, batch)
 	require.NoError(t, err)
 	err = state.Update(&core.Header{Number: 1}, stateUpdate, classes2, false)
 	require.NoError(t, err)
+	require.NoError(t, batch.Write())
 
 	historyBlock0, err := NewStateHistory(0, &felt.Zero, stateDB)
 	require.NoError(t, err)
@@ -225,7 +229,8 @@ func TestStateHistoryContractStorageLastUpdatedBlock(t *testing.T) {
 	value := felt.NewFromUint64[felt.Felt](99)
 
 	stateDB := newTestStateDB()
-	state, err := New(&felt.Zero, stateDB)
+	batch := stateDB.disk.NewBatch()
+	state, err := New(&felt.Zero, stateDB, batch)
 	require.NoError(t, err)
 
 	su0 := &core.StateUpdate{
@@ -239,11 +244,13 @@ func TestStateHistoryContractStorageLastUpdatedBlock(t *testing.T) {
 	}
 	firstChangeBlock := uint64(0)
 	require.NoError(t, state.Update(&core.Header{Number: firstChangeBlock}, su0, nil, true))
+	require.NoError(t, batch.Write())
 
 	root0, err := state.Commitment("")
 	require.NoError(t, err)
 
-	state, err = New(&root0, stateDB)
+	batch = stateDB.disk.NewBatch()
+	state, err = New(&root0, stateDB, batch)
 	require.NoError(t, err)
 
 	su3 := &core.StateUpdate{
@@ -257,6 +264,7 @@ func TestStateHistoryContractStorageLastUpdatedBlock(t *testing.T) {
 	}
 	secondChangeBlock := uint64(3)
 	require.NoError(t, state.Update(&core.Header{Number: secondChangeBlock}, su3, nil, true))
+	require.NoError(t, batch.Write())
 
 	t.Run("returns most recent update before history block", func(t *testing.T) {
 		history, err := NewStateHistory(2, &felt.Zero, stateDB)
