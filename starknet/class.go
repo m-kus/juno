@@ -2,14 +2,40 @@ package starknet
 
 import (
 	"encoding/json"
+	"fmt"
 	"strconv"
+	"strings"
 
 	"github.com/NethermindEth/juno/core/felt"
+	"github.com/consensys/gnark-crypto/ecc/bls12-381/fp"
 )
 
+// EntryPointOffset accepts both decimal integers and hex strings in JSON,
+// since the feeder gateway has used both formats across different class versions.
+type EntryPointOffset felt.Felt
+
+func (o *EntryPointOffset) UnmarshalJSON(data []byte) error {
+	const maxLen = fp.Bits * 3
+	if len(data) > maxLen {
+		return fmt.Errorf("value too large: got %d bytes, max is %d", len(data), maxLen)
+	}
+
+	s := strings.Trim(string(data), `"`)
+	_, err := (*felt.Felt)(o).SetString(s)
+	return err
+}
+
+func (o EntryPointOffset) MarshalJSON() ([]byte, error) {
+	return (*felt.Felt)(&o).MarshalJSON()
+}
+
+func (o EntryPointOffset) String() string {
+	return (*felt.Felt)(&o).String()
+}
+
 type EntryPoint struct {
-	Selector *felt.Felt `json:"selector"`
-	Offset   *felt.Felt `json:"offset"`
+	Selector *felt.Felt        `json:"selector"`
+	Offset   *EntryPointOffset `json:"offset"`
 }
 
 type SierraEntryPoints struct {
